@@ -15,7 +15,10 @@ public class QuakePlayer : MonoBehaviour
     private Vector3 m_accel_direction;
     private Vector3 m_input_abs;
     private float m_accel = 100.0f;
-    public float m_jump_force = 15.0f;
+    
+    private float m_jump_height = 1.0f;
+    private float m_jump_force = 0.0f;
+    private Vector3 m_unbounded_jump_normal = Vector3.zero;
     private float m_fall_speed; // per second
     private float m_friction_factor = 0.8f;
     private float m_speed_limit = 10.0f;
@@ -26,7 +29,7 @@ public class QuakePlayer : MonoBehaviour
         m_rigidbody = GetComponent<Rigidbody>();
         m_accel_direction = Vector3.zero;
         m_capsule = GetComponentInChildren<CapsuleCollider>();
-        m_fall_speed = m_jump_force * 2.6f;
+        m_jump_force = Mathf.Sqrt(-2f * Physics.gravity.y * m_jump_height);
     }
 
     // Update is called once per frame
@@ -61,33 +64,24 @@ public class QuakePlayer : MonoBehaviour
         Vector3 hvel = GetHorizontalVelocity(rb.velocity);
         Vector3 new_velocity = Vector3.ClampMagnitude(hvel, m_speed_limit);
         new_velocity.y = temp_y;
-        if (m_accel_direction.x == 0.0f)
-            new_velocity.x *= m_friction_factor;
-        if (m_accel_direction.z == 0.0f)
-            new_velocity.z *= m_friction_factor;
-        rb.velocity = new_velocity;
-    }
-
-    bool CheckGrounded(Collision collision)
-    {
-        foreach (ContactPoint contact in collision.contacts)
+        if (m_grounded)
         {
-            if (contact.normal.y > 0.0f) return true;
+            if (m_accel_direction.x == 0.0f)
+                new_velocity.x *= m_friction_factor;
+            if (m_accel_direction.z == 0.0f)
+                new_velocity.z *= m_friction_factor;
         }
-        return false;
+        rb.velocity = new_velocity;
     }
 
     void VerticalMovement(Rigidbody rb)
     {
         if (m_jump_request && m_grounded)
         {
-            Debug.Log("Jump!");
-            rb.AddForce(0.0f, m_jump_force, 0.0f, ForceMode.Impulse);
+            // normalize jump normal
+            Vector3 jump_normal = m_unbounded_jump_normal.normalized;
+            rb.AddForce(jump_normal * m_jump_force, ForceMode.Impulse);
             m_jump_request = false;
-        }
-        else
-        {
-            //rb.AddForce(0.0f, -m_fall_speed, 0.0f, ForceMode.Force);
         }
     }
     void FixedUpdate()
@@ -95,14 +89,28 @@ public class QuakePlayer : MonoBehaviour
         HorizontalMovement(m_rigidbody);
         VerticalMovement(m_rigidbody);
         m_grounded = false;
+        m_unbounded_jump_normal = Vector3.zero;
+    }
+
+    void ContactPointEvaluation(Collision collision)
+    {
+        foreach (ContactPoint contact in collision.contacts)
+        {
+            if (contact.normal.y > 0.0f) 
+            {
+                m_grounded = true;
+                // accumulate contact point normals to influence jumping direction
+                m_unbounded_jump_normal += contact.normal;
+            }
+        }
     }
 
     void OnCollisionEnter(Collision collision)
     {
-        m_grounded |= CheckGrounded(collision);
+        ContactPointEvaluation(collision);
     }
     void OnCollisionStay(Collision collision)
     {
-        m_grounded |= CheckGrounded(collision);
+        ContactPointEvaluation(collision);
     }
 }
