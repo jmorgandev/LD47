@@ -7,9 +7,12 @@ public class QuakePlayer : MonoBehaviour
     private Rigidbody m_rigidbody;
     private Camera m_camera;
     private bool m_grounded;
+
+    private float y_look = 0f;
+    private float MOUSE_SENSITIVITY = 160f;
     private CapsuleCollider m_capsule;
     private float m_last_jump_input;
-    private float m_jump_input_fudge = 0.2f; // 0.4 seconds
+    private float m_jump_input_fudge = 0.2f; // 0.2 seconds
     private bool m_jump_request;
 
     private Vector3 m_accel_direction;
@@ -19,7 +22,6 @@ public class QuakePlayer : MonoBehaviour
     private float m_jump_height = 1.0f;
     private float m_jump_force = 0.0f;
     private Vector3 m_unbounded_jump_normal = Vector3.zero;
-    private float m_fall_speed; // per second
     private float m_friction_factor = 0.8f;
     private float m_speed_limit = 10.0f;
     // Start is called before the first frame update
@@ -30,6 +32,7 @@ public class QuakePlayer : MonoBehaviour
         m_accel_direction = Vector3.zero;
         m_capsule = GetComponentInChildren<CapsuleCollider>();
         m_jump_force = Mathf.Sqrt(-2f * Physics.gravity.y * m_jump_height);
+        Cursor.lockState = CursorLockMode.Locked;
     }
 
     // Update is called once per frame
@@ -49,6 +52,23 @@ public class QuakePlayer : MonoBehaviour
         if (Time.time - m_last_jump_input > m_jump_input_fudge)
         {
             m_jump_request = false;
+        }
+
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            Cursor.lockState = (Cursor.lockState == CursorLockMode.Locked) ?
+                                    CursorLockMode.None : CursorLockMode.Locked;
+        }
+
+        if (Cursor.lockState == CursorLockMode.Locked)
+        {
+            // Camera up/down
+            Vector2 mouse_motion = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
+            y_look = Mathf.Clamp(y_look + (-mouse_motion.y * MOUSE_SENSITIVITY * Time.deltaTime), -90f, 90f);
+            m_camera.transform.localRotation = Quaternion.Euler(y_look, 0f, 0f);
+
+            // Rigidbody left/right
+            transform.Rotate(new Vector3(0f, mouse_motion.x * MOUSE_SENSITIVITY * Time.deltaTime, 0f));
         }
     }
 
